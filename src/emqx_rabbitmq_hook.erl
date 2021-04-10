@@ -17,7 +17,7 @@
 -module(emqx_rabbitmq_hook).
 
 -include_lib("emqx/include/emqx.hrl").
--include_lib("amqp_client/include/amqp_client.hrl").
+-include("include/emqx_rabbitmq_hook.hrl").
 
 -export([ load/1
         , unload/0
