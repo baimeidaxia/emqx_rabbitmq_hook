@@ -40,19 +40,23 @@ load(Env) ->
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     io:format("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
               [ClientId, ClientInfo, ConnInfo]),
-    publish_message("connented").
+
+    ClientInfo2 = ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
+    ConnInfo2 = ConnInfo#{peername := ip_port_to_binary(maps:get(peername, ConnInfo)), sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))},
+
+    publish_message("client.connected", #{ clientInfo => ClientInfo2, connInfo => ConnInfo2}).
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
     io:format("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
-              [ClientId, ReasonCode, ClientInfo, ConnInfo]),
-    publish_message("disconnected").
+              [ClientId, ReasonCode, ClientInfo, ConnInfo]).
+    % publish_message("disconnected").
 
 %% Called when the plugin application stop
 unload() ->
     emqx:unhook('client.connected',    {?MODULE, on_client_connected}),
     emqx:unhook('client.disconnected', {?MODULE, on_client_disconnected}).
 
-publish_message(Message) ->
+publish_message(RoutingKey, Payload) ->
     application:ensure_started(amqp_client),
 
     {ok, Connection} =
@@ -67,9 +71,20 @@ publish_message(Message) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),
     io:format("opened amqp connection channel \n"),
 
-    Payload = <<Message>>,
-    Publish = #'basic.publish'{exchange = <<"t.jxp">>, routing_key = <<"*">>},
-    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = Payload}),
+    Publish = #'basic.publish'{exchange = <<"t.jxp">>, routing_key = list_to_binary(RoutingKey) },
+    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jiffy:encode(Payload) }),
 
     amqp_connection:close(Connection),
     io:format("closed amqp connection \n").
+
+ip_to_binary(IpTuple) ->
+    list_to_binary(ip_to_string(IpTuple)).
+
+ip_to_string(IpTuple) ->
+    string:join(lists:map(fun(X)-> integer_to_list(X) end, tuple_to_list(IpTuple)), ".").
+
+ip_port_to_binary(IpPortTuple) ->
+    {IP_Tuple, Port} = IpPortTuple,
+    IpStr = ip_to_string(IP_Tuple),
+    PortStr = integer_to_list(Port),
+    list_to_binary(string:join([IpStr, PortStr], ":")).
