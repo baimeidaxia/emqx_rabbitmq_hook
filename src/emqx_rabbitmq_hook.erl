@@ -28,10 +28,16 @@
         , on_client_disconnected/4
         ]).
 
+%% Session Lifecircle Hooks
+-export([ on_session_subscribed/4        
+        ]).
+
+
 %% Called when the plugin application start
 load(Env) ->
     emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
-    emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}).
+    emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
+    emqx:hook('session.subscribed',  {?MODULE, on_session_subscribed, [Env]}).
 
 %%--------------------------------------------------------------------
 %% Client Lifecircle Hooks
@@ -41,15 +47,26 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     io:format("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
               [ClientId, ClientInfo, ConnInfo]),
 
-    ClientInfo2 = ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
-    ConnInfo2 = ConnInfo#{peername := ip_port_to_binary(maps:get(peername, ConnInfo)), sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))},
-
-    publish_message("client.connected", #{ clientInfo => ClientInfo2, connInfo => ConnInfo2}).
+    publish_message("client.connected", #{ 
+        clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))}, 
+        connInfo => ConnInfo#{
+            peername := ip_port_to_binary(maps:get(peername, ConnInfo)), 
+            sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))}
+    }).
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
     io:format("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
-              [ClientId, ReasonCode, ClientInfo, ConnInfo]).
-    % publish_message("disconnected").
+              [ClientId, ReasonCode, ClientInfo, ConnInfo]),
+    
+    publish_message("client.disconnected", #{ 
+        clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))}, 
+        connInfo => ConnInfo#{
+            peername := ip_port_to_binary(maps:get(peername, ConnInfo)), 
+            sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))}
+    }).
+
+on_session_subscribed(#{clientid := ClientId}, Topic, SubOpts, _Env) ->
+    io:format("Session(~s) subscribed ~s with subopts: ~p~n", [ClientId, Topic, SubOpts]).
 
 %% Called when the plugin application stop
 unload() ->
