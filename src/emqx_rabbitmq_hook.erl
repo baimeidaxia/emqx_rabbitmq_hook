@@ -65,8 +65,13 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
             sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))}
     }).
 
-on_session_subscribed(#{clientid := ClientId}, Topic, SubOpts, _Env) ->
-    io:format("Session(~s) subscribed ~s with subopts: ~p~n", [ClientId, Topic, SubOpts]).
+on_session_subscribed(ClientInfo = #{clientid := ClientId}, Topic, SubOpts, _Env) ->
+    io:format("Session(~s) subscribed ~s with subopts: ~p~n", [ClientId, Topic, SubOpts]),
+    publish_message("session.subscribed", #{ 
+        clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))}, 
+        topic => Topic,
+        opts => SubOpts
+    }).
 
 %% Called when the plugin application stop
 unload() ->
@@ -77,19 +82,14 @@ publish_message(RoutingKey, Payload) ->
     application:ensure_started(amqp_client),
 
     {ok, Connection} =
-	amqp_connection:start(#amqp_params_network{host =
-						       "192.168.1.200",
-						   port = 5672,
-						   username = <<"bss">>,
-						   password =
-						       <<"junfang123">>}),
+	amqp_connection:start(#amqp_params_network{host = "192.168.1.200", port = 5672, username = <<"bss">>, password = <<"junfang123">>}),
     io:format("created amqp connection \n"),
 
     {ok, Channel} = amqp_connection:open_channel(Connection),
     io:format("opened amqp connection channel \n"),
 
     Publish = #'basic.publish'{exchange = <<"t.jxp">>, routing_key = list_to_binary(RoutingKey) },
-    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jiffy:encode(Payload) }),
+    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jiffy:encode(Payload) , props=#'P_basic'{content_type = <<"application/json">>, content_encoding = <<"UTF-8">>}}),
 
     amqp_connection:close(Connection),
     io:format("closed amqp connection \n").
