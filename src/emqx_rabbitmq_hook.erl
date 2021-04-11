@@ -32,12 +32,21 @@
 -export([ on_session_subscribed/4        
         ]).
 
+%% Message Pubsub Hooks
+-export([ on_message_publish/2
+        , on_message_acked/3
+        , on_message_dropped/4
+        ]).
+
 
 %% Called when the plugin application start
 load(Env) ->
     emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
     emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
-    emqx:hook('session.subscribed',  {?MODULE, on_session_subscribed, [Env]}).
+    emqx:hook('session.subscribed',  {?MODULE, on_session_subscribed, [Env]}),
+    emqx:hook('message.publish',     {?MODULE, on_message_publish, [Env]}),
+    emqx:hook('message.acked',       {?MODULE, on_message_acked, [Env]}),
+    emqx:hook('message.dropped',     {?MODULE, on_message_dropped, [Env]}).
 
 %%--------------------------------------------------------------------
 %% Client Lifecircle Hooks
@@ -72,6 +81,24 @@ on_session_subscribed(ClientInfo = #{clientid := ClientId}, Topic, SubOpts, _Env
         topic => Topic,
         opts => SubOpts
     }).
+
+
+%%--------------------------------------------------------------------
+%% Message PubSub Hooks
+%%--------------------------------------------------------------------
+
+on_message_publish(Message, _Env) ->
+    io:format("Publish ~s~n", [emqx_message:format(Message)]),
+    {ok, Message}.
+
+on_message_dropped(Message, _By = #{node := Node}, Reason, _Env) ->
+    io:format("Message dropped by node ~s due to ~s: ~s~n",
+              [Node, Reason, emqx_message:format(Message)]).
+
+on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
+    io:format("Message acked by client(~s): ~s~n",
+              [ClientId, emqx_message:format(Message)]).
+
 
 %% Called when the plugin application stop
 unload() ->
