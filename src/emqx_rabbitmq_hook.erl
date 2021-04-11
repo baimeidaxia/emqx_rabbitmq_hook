@@ -87,9 +87,20 @@ on_session_subscribed(ClientInfo = #{clientid := ClientId}, Topic, SubOpts, _Env
 %% Message PubSub Hooks
 %%--------------------------------------------------------------------
 
+on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
+    {ok, Message};
+
 on_message_publish(Message, _Env) ->
     io:format("Publish ~s~n", [emqx_message:format(Message)]),
-    {ok, Message}.
+
+    Headers = maps:get("headers", Message),
+
+    publish_message("message.publish", #{ 
+        message => Message#{ headers := Headers#{ peerhost := ip_to_binary(maps:get(peerhost, Message))}}
+    }).
+
+on_message_dropped(#message{topic = <<"$SYS/", _/binary>>}, _By, _Reason, _Env) ->
+    ok;
 
 on_message_dropped(Message, _By = #{node := Node}, Reason, _Env) ->
     io:format("Message dropped by node ~s due to ~s: ~s~n",
