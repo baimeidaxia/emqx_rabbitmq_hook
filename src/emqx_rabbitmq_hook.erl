@@ -91,9 +91,14 @@ on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
     {ok, Message};
 
 on_message_publish(Message, _Env) ->
-    io:format("Publish ~s~n", [emqx_message:format(Message)]),
+    io:format("Publish ~s~n", [emqx_message:format()]),
 
-    Headers = maps:get("headers", Message),
+    #message{id = Id, qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload=Payload} = Message,
+
+    publish_message("message.publish", #{
+        id => emqx_guid:to_hexstr(emqx_guid:gen()),
+        payload => Payload
+    }).
 
     publish_message("message.publish", #{ 
         message => Message#{ headers := Headers#{ peerhost := ip_to_binary(maps:get(peerhost, Message))}}
@@ -127,7 +132,7 @@ publish_message(RoutingKey, Payload) ->
     io:format("opened amqp connection channel \n"),
 
     Publish = #'basic.publish'{exchange = <<"t.jxp">>, routing_key = list_to_binary(RoutingKey) },
-    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jiffy:encode(Payload) , props=#'P_basic'{content_type = <<"application/json">>, content_encoding = <<"UTF-8">>}}),
+    amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jsx:encode(Payload) , props=#'P_basic'{content_type = <<"application/json">>, content_encoding = <<"UTF-8">>}}),
 
     amqp_connection:close(Connection),
     io:format("closed amqp connection \n").
