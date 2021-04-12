@@ -97,11 +97,13 @@ on_message_publish(Message, _Env) ->
 
     publish_message("message.publish", #{
         id => emqx_guid:to_hexstr(emqx_guid:gen()),
-        payload => Payload
-    }).
-
-    publish_message("message.publish", #{ 
-        message => Message#{ headers := Headers#{ peerhost := ip_to_binary(maps:get(peerhost, Message))}}
+        qos => QoS, 
+        topic => Topic,
+        from => From, 
+        flags => Flags, 
+        headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost,Headers))}, 
+        payload => Payload, 
+        timestamp => Timestamp
     }).
 
 on_message_dropped(#message{topic = <<"$SYS/", _/binary>>}, _By, _Reason, _Env) ->
