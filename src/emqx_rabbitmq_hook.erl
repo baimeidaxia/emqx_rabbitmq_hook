@@ -93,7 +93,7 @@ on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
 on_message_publish(Message, _Env) ->
     io:format("Publish ~s~n", [emqx_message:format()]),
 
-    #message{id = Id, qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload=Payload} = Message,
+    #message{id = Id, qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload = Payload, timestamp = Timestamp} = Message,
 
     publish_message("message.publish", #{
         id => emqx_guid:to_hexstr(emqx_guid:gen()),
