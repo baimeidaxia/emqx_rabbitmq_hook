@@ -1,3 +1,4 @@
+-define(APP, emqx_rabbitmq_hook).
 
 -record(amqp_params_network, {username           = <<"guest">>,
                               password           = <<"guest">>,

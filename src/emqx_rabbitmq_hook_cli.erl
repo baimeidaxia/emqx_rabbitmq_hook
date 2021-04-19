@@ -16,11 +16,18 @@
 
 -module(emqx_rabbitmq_hook_cli).
 
--export([cmd/1]).
+-include("emqx_rabbitmq_hook.hrl").
 
-cmd(["arg1", "arg2"]) ->
-    emqx_ctl:print("ok");
+-behaviour(ecpool_worker).
 
-cmd(_) ->
-    emqx_ctl:usage([{"cmd arg1 arg2", "cmd demo"}]).
+-export([connect/0]).
 
+connect() ->
+  ConnOpts = #amqp_params_network{
+    host = application:get_env(?APP, host),
+    port = application:get_env(?APP, port),
+    username = application:get_env(?APP, username),
+    password = application:get_env(?APP, password)
+  },
+  {ok, C} = amqp_connection:start(ConnOpts),
+  {ok, C}.

@@ -124,20 +124,15 @@ unload() ->
     emqx:unhook('client.disconnected', {?MODULE, on_client_disconnected}).
 
 publish_message(RoutingKey, Payload) ->
-    application:ensure_started(amqp_client),
+    ecpool:with_client(?APP, fun(C) -> publish_message(RoutingKey, Payload,C) end).
 
-    {ok, Connection} =
-	amqp_connection:start(#amqp_params_network{host = "192.168.1.200", port = 5672, username = <<"bss">>, password = <<"junfang123">>}),
-    io:format("created amqp connection \n"),
-
+publish_message(RoutingKey, Payload, Connection) ->
     {ok, Channel} = amqp_connection:open_channel(Connection),
-    io:format("opened amqp connection channel \n"),
 
-    Publish = #'basic.publish'{exchange = <<"t.jxp">>, routing_key = list_to_binary(RoutingKey) },
+    Publish = #'basic.publish'{exchange = list_to_binary(application:get_env("exchange")), routing_key = list_to_binary(RoutingKey) },
     amqp_channel:cast(Channel, Publish, #amqp_msg{payload = jsx:encode(Payload) , props=#'P_basic'{content_type = <<"application/json">>, content_encoding = <<"UTF-8">>}}),
 
-    amqp_connection:close(Connection),
-    io:format("closed amqp connection \n").
+    amqp_channel:close(Channel).
 
 ip_to_binary(IpTuple) ->
     list_to_binary(ip_to_string(IpTuple)).
