@@ -69,7 +69,8 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
     publish_message("client.disconnected", #{
 			clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
 		    connInfo => ConnInfo#{peername := ip_port_to_binary(maps:get(peername, ConnInfo)),
-			sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))}
+			sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))},
+			reasonCode => ReasonCode
 		}
 	).
 
