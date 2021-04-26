@@ -96,7 +96,7 @@ on_message_publish(Message, _Env) ->
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
-		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers))},
+		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers, {}))},
 		    payload => Payload, timestamp => Timestamp
 		}
 	).
@@ -111,7 +111,7 @@ on_message_dropped(Message, _By = #{node := Node},Reason, _Env) ->
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
-		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers))},
+		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers, {}))},
 		    payload => Payload, timestamp => Timestamp,
 			reason => Reason
 		}
@@ -124,7 +124,7 @@ on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
-		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers))},
+		    headers => Headers#{peerhost => ip_to_binary(maps:get(peerhost, Headers, {}))},
 		    payload => Payload, timestamp => Timestamp
 		}
 	).
