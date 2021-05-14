@@ -57,7 +57,7 @@ unload() ->
 
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     io:format("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n", [ClientId, ClientInfo, ConnInfo]),
-    publish_message("client.connected", #{
+    publish_message("client.connected", "client.connected", #{
 			clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
 			connInfo => ConnInfo#{peername := ip_port_to_binary(maps:get(peername, ConnInfo)), 
 			sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))}
@@ -66,7 +66,7 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
     io:format("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n", [ClientId, ReasonCode, ClientInfo, ConnInfo]),
-    publish_message("client.disconnected", #{
+    publish_message("client.disconnected", "client.disconnected", #{
 			clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
 		    connInfo => ConnInfo#{peername := ip_port_to_binary(maps:get(peername, ConnInfo)),
 			sockname := ip_port_to_binary(maps:get(sockname, ConnInfo))},
@@ -76,7 +76,7 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
 
 on_session_subscribed(ClientInfo = #{clientid := ClientId}, Topic, SubOpts, _Env) ->
     io:format("Session(~s) subscribed ~s with subopts: ~p~n", [ClientId, Topic, SubOpts]),
-    publish_message("session.subscribed", #{
+    publish_message(Topic, "session.subscribed", #{
 			clientInfo => ClientInfo#{peerhost := ip_to_binary(maps:get(peerhost, ClientInfo))},
 		    topic => Topic, opts => SubOpts
 		}
@@ -92,7 +92,7 @@ on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
 on_message_publish(Message, _Env) ->
     io:format("Publish ~s~n", [emqx_message:format(Message)]),
     #message{qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload = Payload, timestamp = Timestamp} = Message,
-    publish_message("message.publish", #{
+    publish_message(Topic, "message.publish", #{
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
@@ -107,7 +107,7 @@ on_message_dropped(#message{topic = <<"$SYS/", _/binary>>}, _By, _Reason, _Env) 
 on_message_dropped(Message, _By = #{node := Node},Reason, _Env) ->
     io:format("Message dropped by node ~s due to ~s: ~s~n", [Node, Reason, emqx_message:format(Message)]),
 	#message{qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload = Payload, timestamp = Timestamp} = Message,
-    publish_message("message.dropped", #{
+    publish_message(Topic, "message.dropped", #{
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
@@ -120,7 +120,7 @@ on_message_dropped(Message, _By = #{node := Node},Reason, _Env) ->
 on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
     io:format("Message acked by client(~s): ~s~n", [ClientId, emqx_message:format(Message)]),
 	#message{qos = QoS, topic = Topic, from = From, flags = Flags, headers = Headers, payload = Payload, timestamp = Timestamp} = Message,
-    publish_message("message.acked", #{
+    publish_message(Topic, "message.acked", #{
 			id => emqx_guid:to_hexstr(emqx_guid:gen()),
 		    qos => QoS, topic => Topic, from => From,
 		    flags => Flags,
@@ -145,19 +145,21 @@ connect(Opts) ->
     io:format("amqp connection started~n"),
     {ok, C}.
 
-publish_message(RoutingKey, Payload) ->
-    ecpool:with_client(?APP, fun (C) -> publish_message(RoutingKey, Payload, C) end).
+publish_message(Topic, Event, Payload) ->
+    ecpool:with_client(?APP, fun (C) -> publish_message(Topic, Event, Payload, C) end).
 
-publish_message(RoutingKey, Payload, Connection) ->
-    {ok, Channel} =
-	amqp_connection:open_channel(Connection),
+publish_message(Topic, Event, Payload, Connection) ->
+	RoutingKey = list_to_binary(string:replace(Topic, "/", ".", all)),
+	io:format("convert topic/~s to routingKey/~s with event/~s ~n", [Topic, RoutingKey, Event]),
+    {ok, Channel} = amqp_connection:open_channel(Connection),
     {ok, Exchange} = application:get_env(?APP, exchange),
-    Publish = #'basic.publish'{exchange = list_to_binary(Exchange), routing_key = list_to_binary(RoutingKey)},
+    Publish = #'basic.publish'{exchange = list_to_binary(Exchange), routing_key = RoutingKey},
     amqp_channel:cast(Channel, Publish, #amqp_msg{
 			payload = jsx:encode(Payload), 
 			props = #'P_basic'{
 						content_type = <<"application/json">>,
-						content_encoding = <<"UTF-8">>
+						content_encoding = <<"UTF-8">>,
+						headers = [{"type", longstr, Event}]
 					}
 		}
 	),
