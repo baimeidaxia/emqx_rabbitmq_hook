@@ -16,7 +16,7 @@
 
 -module(emqx_rabbitmq_hook).
 
--include("emqx.hrl").
+-include_lib("emqx/include/emqx.hrl").
 
 -include("emqx_rabbitmq_hook.hrl").
 
